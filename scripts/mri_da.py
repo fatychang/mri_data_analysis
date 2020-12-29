@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Nov 22 15:51:14 2020
-This script aims to analyze the mri scan time in different condition
+This script aims to analyze the mri scan time in different conditions
 It is meant for analyzing all data from database.
 
 This second version is modified after Lin Chen's discussion with her colleagues
