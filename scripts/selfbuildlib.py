@@ -134,7 +134,7 @@ def read_data(loc):
     ## Create the dataframe for the remaining data
     df_data = pd.concat(dict_data, ignore_index=True)
     
-    return df_data
+    return df_data, dict_data
 
 '''
 Find the duplicated account number and extract them to a new dataframe
@@ -165,106 +165,23 @@ def find_duplicates(df, ls_acc):
     return df, df_dup
 
 '''
-Clean dataset before using. The cleaning process includes the following steps:
-    1. Remove unused columns
-    2. Remove rows with nan.
-    3. Calculate the patient ability level
-    4. Group the patient by their age range
-    5. Extract unsuccessful cases
-    6. Convert acc data type
-    7. Extract recall
-    8. Make sure all inputs are in small letter
-Arguments:
-    - df: dataframe stored the data
-    - col_name: the name of the columns intended to be removed
-    - ageThres: the threshold used to group the patients to either junior or senior
-Return:
-    - df: returned data
+Remove unused columns
 '''
-# df = df_data
-# col_name = ["remark"]
-# ageThres = 70
-def clean_data(df, col_name, ageThres):
-    # 1. Remove unused columns
+def remove_unused_cols(df, col_name):
     df.drop(col_name, axis=1, inplace=True)
     df.reset_index(drop=True, inplace=True)
     
-    ## (for database)
-    ## Remove the last column in the dataset (untended added by the radiographer for 30-Nov-2-Jan.xlsx)
-    df.drop(df.columns[-1], axis=1, inplace=True)
-    
-    # 2. Remove rows with nan.
-    df = df[df["acc."].notna()]
+    return df
 
-    
-    # 3. Calculate the patient ability level
-    df = cal_level_of_coorperation(df)   
-    # Classify patient ability level to High(11-15), Moderate(6-10) or Low(1-5)
-    # add a new column in the dataframe
-    new_feature = ['']*df.shape[0]
-    df['class_level'] = new_feature
-    # classify patient ability level to one of the group
-    df = classify_patient_level(df)
-    
-    # 4. ## Classify age to Junior and Senior
-    df['class_age'] = new_feature
-    # classify patient to either junior or senior based on the threshold
-    df = classify_patient_age(df, ageThres)
-    
-    # 8. Make sure all inputs are in small letter
-    df = all_small(df, 'gender')
-    df = all_small(df, 'patient_type')
-    df = all_small(df, 'order')
-    df = all_small(df, 'contrast')
-    df = all_small(df, 'operator')
-    df = all_small(df, 'implants')
-    df = all_small(df, 'successful')
-    df = all_small(df, 'sedation')
-    
-
-    
-    # 6. Convert acc data type
-    df = convert_acc_to_list(df)
-    
-    # remove rows (ONLY for database data)
-    label = [111, 126, 128, 171, 221]
-    df.drop(index=label, inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    
-    # 5. extrect the unsuccessful cases
-    df_un = df[df.successful == 'n']
-    df.drop(index = df_un.index, inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    df_un.reset_index(drop=True, inplace=True)
-    
-    # 7. Extract recall (repeated acc number)
-    all_acc = []
-    for val in df["acc."]:
-        print(val)
-        for i in range(len(val)):
-            all_acc.append(val[i])
-    # extract the repeated acc number
-    # duplicates = [item for item, count in collections.Counter(all_acc).items() if count > 1]
-    # # extract the duplicated rows
-    # df_duplicated = df[df["acc."] in duplicates]
-    
-
-            
-    return df, df_un, all_acc
 '''
 Calculate the number of orders by extracting the number of / in the account column
-Arguments:
-    - df: dataframe stored the data
-Return:
-    - df: the number of order
 ''' 
 def calculate_num_orders(df):
-    additional = 0
+    num = 0
     for val in df["acc."]:
-        if type(val) == str:
-            if len(val) in [17, 26, 35, 44, 53]:
-                additional += len(val)%8
-    return additional + df.shape[0]
+
+        num += len(val)
+    return num
   
 '''
 datetime - datetime and return minute interval
@@ -288,15 +205,29 @@ Arguement:
 Return:
     - df: modified dataset    
 '''
-def all_small(df, col):
-    
-    df[col] = df[col].str.lower()
-    
+def all_small(df, cols):
+    for col in cols:
+        df[col] = df[col].str.lower()
     return df
     
+'''
+Calculate the duration
+Argument:
+    - df: dataframe
+    - start_col: column name of the starting time
+    - end_col: column name of the end time
+    - new_col: new column name to store the duration
+'''  
+def calculate_duration(df, end_col, start_col, new_col):
+    for i in range (df.shape[0]):              
+        start = df[start_col][i]
+        end = df[end_col][i]
+        df[new_col][i] = minute_interval(start, end)
+    return df
     
-    
-
+        # start = df_data["transfer strat_time"][index]
+        # end = df_data["transfer end_time"][index]
+        # df_data['in_room_minute'][index] = lib.minute_interval(start, end)
 
     
     
