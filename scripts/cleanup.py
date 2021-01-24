@@ -17,8 +17,9 @@ import selfbuildlib as lib
 ###########################
 ### read the excel file ###
 ########################### 
-filename = "../data/4 Jan-9 Jan.xlsm"
-df_data, dict_data = lib.read_data(filename)
+directory = "../data/raw/"
+file_name = "11-Jan-16-Jan"
+df_data, dict_data = lib.read_data(directory+file_name+".xlsm")
 
 # reset the index
 df_data.reset_index(drop=True, inplace=True)
@@ -62,8 +63,29 @@ df_data = lib.add_day_to_dataset(df_data)
 ## Calcuate idle time
 df_data = lib.calculate_idle_time(df_data, 'idle_time')
 
+
+#########################
+### Find recall cases ###
+########################
+# conver the account number to list
+df_data = lib.convert_acc_to_list(df_data)
+all_acc = []
+for val in df_data["acc"]:
+    for i in range(len(val)):
+        all_acc.append(val[i])
+
+# find the duplicates
+df_data, df_recall, duplicates = lib.find_duplicates(df_data, all_acc)
+df_data["recall"] = ["n"]*df_data.shape[0]
+
+
+# add a column named as recall (the second scan)
+index = df_recall.index
+for i in index:
+    df_data.recall.iloc[i] = 'y'
+
 #######################
 ### Output new xlsx ###
 #######################
-output_file_loc = "../results/"
-df_data.to_excel(output_file_loc+"tmp.xlsx")
+output_file_loc = "../data/clean/"
+df_data.to_excel(output_file_loc+file_name+"_clean.xlsx")

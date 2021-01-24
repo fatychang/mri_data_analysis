@@ -18,36 +18,36 @@ Convert the acc to list data type
 def convert_acc_to_list(df):
     df.reset_index(drop=True, inplace=True)
     
-    for idx, val in enumerate(df["acc."]):
+    for idx, val in enumerate(df["acc"]):
         lst_acc = []
         if len(str(val)) == 8:
             lst_acc.append(str(val))
-            df["acc."].loc[idx] = lst_acc
+            df["acc"].loc[idx] = lst_acc
         elif len(str(val)) > 8 and len(str(val)) < 17:
             lst_acc.append(str(val)[0:8])
-            df["acc."].loc[idx] = lst_acc
+            df["acc"].loc[idx] = lst_acc
         elif len(str(val)) == 17:
             lst_acc.append(val[0:8])
             lst_acc.append(val[9:17])
-            df["acc."].loc[idx] = lst_acc
+            df["acc"].loc[idx] = lst_acc
         elif len(str(val)) == 26:
             lst_acc.append(val[0:8])
             lst_acc.append(val[9:17])
             lst_acc.append(val[18:26])
-            df["acc."].loc[idx] = lst_acc
+            df["acc"].loc[idx] = lst_acc
         elif len(str(val)) == 35:
             lst_acc.append(val[0:8])
             lst_acc.append(val[9:17])
             lst_acc.append(val[18:26])
             lst_acc.append(val[27:35])
-            df["acc."].loc[idx] = lst_acc
+            df["acc"].loc[idx] = lst_acc
         elif len(str(val)) == 44:
             lst_acc.append(val[0:8])
             lst_acc.append(val[9:17])
             lst_acc.append(val[18:26])
             lst_acc.append(val[27:35])
             lst_acc.append(val[36:44])
-            df["acc."].loc[idx] = lst_acc
+            df["acc"].loc[idx] = lst_acc
         else:
             print("[ERR] Something wrong at idex: {}".format(idx))
     return df
@@ -88,25 +88,25 @@ def cal_level_of_coorperation(df):
 '''
 Classify the patient ability level to High, Moderate or Low based on the abaility level score
 '''
-def classify_patient_level(df):
+def classify_patient_level(df, col_name):
     for i in range(0, df.shape[0]):
         if(df.level_cooperation.iloc[i] > 10):
-            df.class_level.iloc[i] = 'high'
+            df[col_name].iloc[i] = 'high'
         elif(df.level_cooperation.iloc[i] < 6):
-            df.class_level.iloc[i] = 'low'      
+            df[col_name].iloc[i] = 'low'      
         else:
-            df.class_level.iloc[i] = 'moderate'
+            df[col_name].iloc[i] = 'moderate'
     return df
 
 '''
 Classify the patient to eight junior or senior based on their age
 '''
-def classify_patient_age(df, thres):
+def classify_patient_age(df, thres, col_name):
     for i in range(0, df.shape[0]):
         if(df.age.iloc[i] >= thres):
-            df.class_age.iloc[i] = 'senior'
+            df[col_name].iloc[i] = 'senior'
         else:
-            df.class_age.iloc[i] = 'junior'
+            df[col_name].iloc[i] = 'junior'
     return df
 
 '''
@@ -128,8 +128,8 @@ def read_data(loc):
     
     ## Extract the 'option' and the 'rule' sheet in the dictionary
     dict_rule = {key: dict_data[key] for key in dict_data.keys() & {'option', 'rule'}}
-    del dict_data['option']
-    del dict_data['rule']
+    del dict_data['options']
+    # del dict_data['rule']
     
     ## Create the dataframe for the remaining data
     df_data = pd.concat(dict_data, ignore_index=True)
@@ -150,19 +150,24 @@ def find_duplicates(df, ls_acc):
     duplicates = [item for item, count in collections.Counter(ls_acc).items() if count > 1]
     
     # extract the duplicated rows
+    
     ls_idx = [False]*df.shape[0]
     for val in duplicates:
+        first_found = 0
         for i in range (df.shape[0]):
-            if val in df["acc."][i]:
-                ls_idx[i] = True
+            if val in df["acc"][i]:
+                if first_found == 1:
+                    ls_idx[i] = True
+                else:
+                    first_found =1
     df_dup = df[ls_idx]
     df_data = df[~np.array(ls_idx)]
     
     #reset the index
-    df_dup.reset_index(drop=True, inplace=True)
-    df_data.reset_index(drop=True, inplace=True)
+    # df_dup.reset_index(drop=True, inplace=True)
+    # df_data.reset_index(drop=True, inplace=True)
     
-    return df, df_dup
+    return df, df_dup, duplicates
 
 '''
 Remove unused columns
@@ -178,9 +183,15 @@ Calculate the number of orders by extracting the number of / in the account colu
 ''' 
 def calculate_num_orders(df):
     num = 0
-    for val in df["acc."]:
-
-        num += len(val)
+    for i in range(df.shape[0]):
+        if df["num_orders"].iloc[i] == "single":
+            num +=1
+        elif df["num_orders"].iloc[i] == "two":
+            num +=2
+        elif df["num_orders"].iloc[i] == "three":
+            num+=3
+        else:
+            print("there are others in the number of orders... please check")
     return num
   
 '''
@@ -225,9 +236,41 @@ def calculate_duration(df, end_col, start_col, new_col):
         df[new_col][i] = minute_interval(start, end)
     return df
     
-        # start = df_data["transfer strat_time"][index]
-        # end = df_data["transfer end_time"][index]
-        # df_data['in_room_minute'][index] = lib.minute_interval(start, end)
-
+'''
+Add the day into the dataset
+'''
+def add_day_to_dataset(df):
+    df['day'] = ['']*df.shape[0]
+    date = df.date.unique()
+    day = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat']
+    day_count = 0
     
+    for i in range(df.shape[0]):
+        if(df.date[i] == date[day_count]):
+            df.day[i] = day[day_count]
+        else:
+            day_count +=1
+            if day_count == len(day):
+                break
+            df.day[i] = day[day_count]
+    
+    return df
+    
+'''
+Calculate the idle time between two scans (same day)
+'''    
+def calculate_idle_time(df, col_name):
+    df[col_name] = ['']*df.shape[0]    
+    for i in range(df.shape[0]):
+        if i == df.shape[0]-1:
+            df.idle_time[i] = 0
+            break
+        if df.day[i] == df.day[i+1]: #same day
+            start = df["transfer_end_time"][i]
+            end = df["transfer_strat_time"][i+1]
+            df[col_name][i] = minute_interval(start, end)
+        else:
+            df[col_name][i] = 0
+    
+    return df
     
