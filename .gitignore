@@ -132,3 +132,6 @@ dmypy.json
 # ignore the following folder
 data/
 results/
+
+# ignore this 
+.tmp.drivedownload

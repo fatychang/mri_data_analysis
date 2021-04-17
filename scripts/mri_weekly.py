@@ -28,7 +28,8 @@ import collections
 ########################### 
 
 # filename = "../data/23-28-Nov.xlsx"
-filename = "../data/30-Nov-26-Dec-new.xlsx"
+# filename = "../data/30-Nov-26-Dec-new.xlsx"
+filename = "../data/fake-data1.xlsx"
 df_data, dict_data = lib.read_data(filename)
 
 ###########################
@@ -60,19 +61,38 @@ df_data = lib.cal_level_of_coorperation(df_data)
 # Classify patient ability level to High(11-15), Moderate(6-10) or Low(1-5)
 # add a new column in the dataframe
 new_feature = ['']*df_data.shape[0]
-df_data['class_level'] = new_feature
+df_data['ability_class'] = new_feature
 # classify patient ability level to one of the group
-df_data = lib.classify_patient_level(df_data)
+df_data = lib.classify_patient_level(df_data, 'ability_class')
 
 ## Classify age to Junior and Senior
-df_data['class_age'] = new_feature
+df_data['age_class'] = new_feature
 ageThres = 70
 # classify patient to either junior or senior based on the threshold
-df_data = lib.classify_patient_age(df_data, ageThres)
+df_data = lib.classify_patient_age(df_data, ageThres, 'age_class')
+
+## Add the day to the column
+df_data['day'] = new_feature
+date = df_data.date.unique()
+day = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat']
+day_count = 0
+# for i in range(df_data.shape[0]):
+for i in range(14):
+    if(df_data.date[i] == date[day_count]):
+        df_data.day[i] = day[day_count]
+        print(i, df_data.date[i])
+    else:
+        day_count +=1
+        print(i, day_count)
+        if day_count == len(day):
+            print("here")
+            break
+        
+        df_data.day[i] = day[day_count]
 
 ## ONLY for this file'../data/30-Nov-26-Dec-new.xlsx'
 if filename == '../data/30-Nov-26-Dec-new.xlsx':
-    label = [111, 126, 128, 171, 221]
+    label = [111, 126, 128, 171, 221] 
     df_data.drop(index=label, inplace=True)
     df_data.reset_index(drop=True, inplace=True)
 
@@ -269,7 +289,7 @@ print("[RES] The number of patients are high level:{}".format(num_low))
 if filename != '../data/30-Nov-26-Dec-new.xlsx':
     days = df_ori.date.unique()   
     num_orders_day = []
-    day = ['Mod', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat']
+    day = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat']
     num_orders_day.append(lib.calculate_num_orders(df_ori[df_ori.date == days[0]]))
     num_orders_day.append(lib.calculate_num_orders(df_ori[df_ori.date == days[1]]))
     num_orders_day.append(lib.calculate_num_orders(df_ori[df_ori.date == days[2]]))
@@ -349,6 +369,27 @@ plt.title("In-room time for successful/unsuccessful/recall (mins)")
 plt.show()
 plt.savefig(figloc + 'in-room time-successful_unsuccessful_recall.png')
 
+print("[RES] The total scan time for successful orders (min.):{}".format(scan_time_database))
+print("[RES] The total scan time for unsuccessful orders (min.):{}".format(scan_time_un))
+print("[RES] The total scan time for recall patients(min.):{}".format(scan_time_recall))
+
+#################
+### Idle time ###
+#################
+df_ori["idle_time"] = ['']*df_ori.shape[0]    
+for i in range(df_ori.shape[0]):
+    if i == df_ori.shape[0]-1:
+        df_ori.idle_time[i] = 0
+        break
+    if df_ori.day[i] == df_ori.day[i+1]: #same day
+        start = df_ori["transfer end_time"][i]
+        end = df_ori["transfer strat_time"][i+1]
+        df_ori.idle_time[i] = lib.minute_interval(start, end)
+    else:
+        df_ori.idle_time[i] = 0
+        
+
+
 #####################
 ### Sedation time ###
 #####################
@@ -389,35 +430,42 @@ text_file.write("[RES] The number of unsuccessful patients:{}/{}\n".format(num_p
 text_file.write("[RES] The number of recall patients:{}\n".format(num_patients_recall))
 
 ## Number of orders
-text_file.write("[RES] The number of orders:{}\n".format(num_orders_database))
-text_file.write("[RES] The number of inpatient orders:{}/{}\n".format(num_orders_inpatients, num_orders_database))
-text_file.write("[RES] The number of outpatient orders:{}/{}\n".format(num_orders_outpatients, num_orders_database))
-text_file.write("[RES] The number of icupatient orders:{}/{}\n".format(num_orders_icupatients, num_orders_database))
-text_file.write("[RES] The number of uccpatient orders:{}/{}\n".format(num_orders_uccpatients, num_orders_database))
+text_file.write("[RES] The number of successful orders:{}\n".format(num_orders_database))
+text_file.write("[RES] The number of successful inpatient orders:{}/{}\n".format(num_orders_inpatients, num_orders_database))
+text_file.write("[RES] The number of successful outpatient orders:{}/{}\n".format(num_orders_outpatients, num_orders_database))
+text_file.write("[RES] The number of successful icupatient orders:{}/{}\n".format(num_orders_icupatients, num_orders_database))
+text_file.write("[RES] The number of successful uccpatient orders:{}/{}\n".format(num_orders_uccpatients, num_orders_database))
 
 ## Age
-text_file.write("[RES] The average age among all patients is:{:.2f}+/-{:.2f} (n={})".format(df_ori['age'].mean(), df_ori['age'].std(), df_ori['age'].shape[0]))
+text_file.write("[RES] The average age among all patients is:{:.2f}+/-{:.2f} (n={})\n".format(df_ori['age'].mean(), df_ori['age'].std(), df_ori['age'].shape[0]))
 
 ## Ability data
-text_file.write("[RES] The average ability score among all patients is:{:.2f}+/-{:.2f} (n={})".format(df_ori['level_cooperation'].mean(), df_ori['level_cooperation'].std(), df_ori['level_cooperation'].shape[0]))
-text_file.write("[RES] The number of patients are high level:{}".format(num_high))
-text_file.write("[RES] The number of patients are high level:{}".format(num_moderate))
-text_file.write("[RES] The number of patients are high level:{}".format(num_low))
+text_file.write("[RES] The average ability score among all patients is:{:.2f}+/-{:.2f} (n={})\n".format(df_ori['level_cooperation'].mean(), df_ori['level_cooperation'].std(), df_ori['level_cooperation'].shape[0]))
+text_file.write("[RES] The number of patients are high level:{}\n".format(num_high))
+text_file.write("[RES] The number of patients are moderate level:{}\n".format(num_moderate))
+text_file.write("[RES] The number of patients are low level:{}\n".format(num_low))
 
 ## Date
 if filename != '../data/30-Nov-26-Dec-new.xlsx':
-    text_file.write("[RES] The number of orders on Monday:{}".format(num_orders_day[0]))
-    text_file.write("[RES] The number of orders on Tuesday:{}".format(num_orders_day[1]))
-    text_file.write("[RES] The number of orders on Wednesday:{}".format(num_orders_day[2]))
-    text_file.write("[RES] The number of orders on Thursday:{}".format(num_orders_day[3]))
-    text_file.write("[RES] The number of orders on Friday:{}".format(num_orders_day[4]))
-    text_file.write("[RES] The number of orders on Saterday:{}".format(num_orders_day[5]))
+    text_file.write("[RES] The number of orders on Monday:{}\n".format(num_orders_day[0]))
+    text_file.write("[RES] The number of orders on Tuesday:{}\n".format(num_orders_day[1]))
+    text_file.write("[RES] The number of orders on Wednesday:{}\n".format(num_orders_day[2]))
+    text_file.write("[RES] The number of orders on Thursday:{}\n".format(num_orders_day[3]))
+    text_file.write("[RES] The number of orders on Friday:{}\n".format(num_orders_day[4]))
+    text_file.write("[RES] The number of orders on Saterday:{}\n".format(num_orders_day[5]))
 
 ## Sedation
-text_file.write("[RES] The number of non-sedation patinets:{}".format(num_sedation))
-text_file.write("[RES] The number of sedation patinets:{}".format(num_sedation))
-text_file.write("[RES] The number of oral sedation patinets:{}".format(num_or_sedation))
-text_file.write("[RES] The number of iv sedation patinets:{}".format(num_iv_sedation))
-text_file.write("[RES] The number of ga sedation patinets:{}".format(num_ga_sedation))
+text_file.write("[RES] The number of non-sedation patinets:{}\n".format(num_patients-num_sedation))
+text_file.write("[RES] The number of sedation patinets:{}\n".format(num_sedation))
+text_file.write("[RES] The number of oral sedation patinets:{}\n".format(num_or_sedation))
+text_file.write("[RES] The number of iv sedation patinets:{}\n".format(num_iv_sedation))
+text_file.write("[RES] The number of ga sedation patinets:{}\n".format(num_ga_sedation))
+
+## In-room time
+text_file.write("[RES] The total scan time for successful orders (min.):{}\n".format(scan_time_database))
+text_file.write("[RES] The total scan time for unsuccessful orders (min.):{}\n".format(scan_time_un))
+text_file.write("[RES] The total scan time for recall patients(min.):{}\n".format(scan_time_recall))
+
+## Idle time
 
 text_file.close()

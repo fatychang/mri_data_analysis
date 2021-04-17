@@ -17,7 +17,7 @@ import os
 ######################
 read_directory = "../data/clean/"
 weekly_result_directory = "../results/weekly report/"
-read_file_name = "11-Jan-16-Jan_clean"
+read_file_name = "20201207-20201212_clean"
 write_directory = weekly_result_directory + read_file_name +"/"
 
 # create folder if not exist
@@ -47,7 +47,7 @@ def bar_autolabel(rects):
     """Attach a text label above each bar in *rects*, displaying its height."""
     for rect in rects:
         height = rect.get_height()
-        ax.annotate('{}'.format(height),
+        ax.annotate('{:.1f}'.format(height),
                     xy=(rect.get_x() + rect.get_width() / 2, height),
                     xytext=(0, 3),  # 3 points vertical offset
                     textcoords="offset points",
@@ -75,41 +75,56 @@ df_data = pd.concat(dict_data, ignore_index=True)
 df_normal = df_data.copy()
 df_data_wo_recall = df_data.copy()
 df_failed = df_normal[df_normal.successful == 'n']
-df_recall = df_normal[df_normal.recall == 'y']
+# df_recall = df_normal[df_normal.recall == 'y']
 df_normal.drop(index = df_failed.index, inplace=True)
-df_normal.drop(index = df_recall.index, inplace=True)
-df_data_wo_recall.drop(index = df_recall.index, inplace=True)
+# df_normal.drop(index = df_recall.index, inplace=True)
+# df_data_wo_recall.drop(index = df_recall.index, inplace=True)
 df_normal.reset_index(drop=True, inplace=True)
 df_failed.reset_index(drop=True, inplace=True)
-df_recall.reset_index(drop=True, inplace=True)
+# df_recall.reset_index(drop=True, inplace=True)
 
 
 #############################
 ### (Money) In-room Time  ###
 #############################
-time_money = round(df_normal["in_room_time"].sum())
-time_failed = round(df_failed["in_room_time"].sum())
-time_recall = round(df_recall["in_room_time"].sum())
-time_idle = round(df_data["idle_time"].sum())
-time_total = time_money+time_failed+time_recall
-time_other = time_failed+time_recall
-
+time_money = df_normal["in_room_time"].sum()/60.0
+time_failed = df_failed["in_room_time"].sum()/60.0
+# time_recall = df_recall["in_room_time"].sum()/60.0
+time_idle = df_data["idle_time"].sum()/60.0
+# time_total = time_money+time_failed+time_recall+time_idle
+time_total = time_money+time_failed+time_idle
+# time_other = time_failed+time_recall
+time_other = time_failed
 
 ## Plot pie chart
 plt.figure()
 
-if time_other/ time_total < 0.01:
-    data = [time_money, time_other, time_idle]
-    label = ['successful', 'other', 'idle']
-    plt.title("The total time:{}.\nThe successful time:{}    idle time:{}   other time:{}".format(time_total, time_money, time_idle, time_other))
-else:
-    data = [time_money, time_failed, time_recall, time_idle]
-    label = ['successful', 'failed', 'recall', 'idle']
-    plt.title("The total time:{}.\nThe successful time:{}    idle time:{}   recall time:{}  failed time:{}".format(time_total, time_money, time_idle, time_recall, time_failed))
-    
+# if time_other/ time_total < 0.01:
+#     data = [time_money, time_other, time_idle]
+#     label = ['successful', 'other', 'idle']
+#     plt.title("The total time:{:.2f}.\nThe successful time:{:.2f}    idle time:{:.2f}   other time:{:.2f}".format(time_total, time_money, time_idle, time_other))
+# else:
+#     data = [time_money, time_failed, time_recall, time_idle]
+#     data = [time_money, time_failed, time_recall, time_idle]
+#     label = ['successful', 'failed', 'recall', 'idle']
+#     plt.title("The total time:{:.2f}.\nThe successful time:{:.2f}    idle time:{:.2f}   recall time:{:.2f}  failed time:{:.2f}".format(time_total, time_money, time_idle, time_recall, time_failed))
+  
+data = [time_money, time_failed, time_idle]
+label = ['successful', 'failed', 'idle']
+plt.title("The total time:{:.2f}.\nThe successful time:{:.2f}    idle time:{:.2f}   other time:{:.2f}".format(time_total, time_money, time_idle, time_other))
+
+  
 plt.pie(x=data, labels=label, autopct=lambda pct: pie_draw_n(pct, data, "per"))
 plt.show()
 plt.savefig(write_directory + 'time_allocation.png')
+
+print("[RES] The total time:{}".format(time_total))
+print("[RES] The idle time:{}".format(time_idle))
+print("[RES] The in-room time:{}".format(time_money))
+print("[RES] The failed + recall time:{}".format(time_other))
+print("[RES] The failed ime:{}".format(time_failed))
+# print("[RES] The recall ime:{}".format(time_recall))
+
 
 
 ##########################
@@ -143,8 +158,8 @@ plt.savefig(write_directory + 'Number of patients - gender.png')
 ########################
 ### Number of recall ###
 ########################
-num_patients_recall = df_recall.shape[0]
-print("[RES] The number of recall:{}".format(num_patients_recall))
+# num_patients_recall = df_recall.shape[0]
+# print("[RES] The number of recall:{}".format(num_patients_recall))
 
 
 #####################
@@ -213,6 +228,8 @@ num_orders_day[3] = lib.calculate_num_orders(df_data_wo_recall[df_data_wo_recall
 num_orders_day[4] = lib.calculate_num_orders(df_data_wo_recall[df_data_wo_recall.day == "Fri"])
 num_orders_day[5] = lib.calculate_num_orders(df_data_wo_recall[df_data_wo_recall.day == "Sat"])
 
+# total number of inpatient order
+num_orders_inpatient = lib.calculate_num_orders(df_data_wo_recall[df_data_wo_recall.patient_type == "ip"])
 
 day = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat']
 fig, ax = plt.subplots()
@@ -229,7 +246,7 @@ print("[RES] The number of orders on Wednesday:{}".format(num_orders_day[2]))
 print("[RES] The number of orders on Thursday:{}".format(num_orders_day[3]))
 print("[RES] The number of orders on Friday:{}".format(num_orders_day[4]))
 print("[RES] The number of orders on Saterday:{}".format(num_orders_day[5]))
-
+print("[RES] The number of inpatient orders in the whole week:{}".format(num_orders_inpatient))
 
 
 ###########
@@ -250,7 +267,7 @@ print("[RES] The average age among all patients is:{:.2f}+/-{:.2f} (n={})".forma
 ##############################
 num_inpatients = df_data_wo_recall[df_data_wo_recall["patient_type"] == 'ip'].shape[0]
 num_outpatients = df_data_wo_recall[df_data_wo_recall["patient_type"] == 'op'].shape[0]
-num_icupatients = df_data_wo_recall[df_data_wo_recall["patient_type"] == 'iuc'].shape[0]
+num_icupatients = df_data_wo_recall[df_data_wo_recall["patient_type"] == 'icu'].shape[0]
 num_uccpatients = df_data_wo_recall[df_data_wo_recall["patient_type"] == 'ucc'].shape[0]
 
 print("[RES] The number of inpatients:{}".format(num_inpatients))
@@ -294,7 +311,7 @@ text_file.write("[RES] The number of unsuccessful patients:{}\n".format(num_pati
 text_file.write("[RES] The number of male patients:{}\n".format(num_patients_male))
 text_file.write("[RES] The number of female patients:{}\n".format(num_patients_female))
 
-text_file.write("[RES] The number of recall:{}\n".format(num_patients_recall))
+# text_file.write("[RES] The number of recall:{}\n".format(num_patients_recall))
 text_file.write("[RES] The average ability score among all patients is:{:.2f}+/-{:.2f} (n={})\n".format(df_data_wo_recall['level_cooperation'].mean(), df_data_wo_recall['level_cooperation'].std(), df_data_wo_recall['level_cooperation'].shape[0]))
 text_file.write("[RES] The number of patients are high level:{}\n".format(num_high))
 text_file.write("[RES] The number of patients are moderate level:{}\n".format(num_moderate))
@@ -315,12 +332,20 @@ text_file.write("[RES] The number of orders on Wednesday:{}\n".format(num_orders
 text_file.write("[RES] The number of orders on Thursday:{}\n".format(num_orders_day[3]))
 text_file.write("[RES] The number of orders on Friday:{}\n".format(num_orders_day[4]))
 text_file.write("[RES] The number of orders on Saterday:{}\n".format(num_orders_day[5]))
+text_file.write("[RES] The number of inpatient orders in the whole week:{}\n".format(num_orders_inpatient))
 
 text_file.write("[RES] The average age among all patients is:{:.2f}+/-{:.2f} (n={})\n".format(df_data_wo_recall['age'].mean(), df_data_wo_recall['age'].std(), df_data_wo_recall['age'].shape[0]))
 text_file.write("[RES] The number of inpatients:{}\n".format(num_inpatients))
 text_file.write("[RES] The number of outpatients:{}\n".format(num_outpatients))
 text_file.write("[RES] The number of icupatients:{}\n".format(num_icupatients))
 text_file.write("[RES] The number of uccpatients:{}\n".format(num_uccpatients))
+
+text_file.write("[RES] The total time(hr):{}\n".format(time_total))
+text_file.write("[RES] The idle time(hr):{}\n".format(time_idle))
+text_file.write("[RES] The in-room time(hr):{}\n".format(time_money))
+text_file.write("[RES] The failed + recall time(hr):{}\n".format(time_other))
+text_file.write("[RES] The failed time(hr):{}\n".format(time_failed))
+# text_file.write("[RES] The recall ime:{}\n".format(time_recall))
 
 
 text_file.close()

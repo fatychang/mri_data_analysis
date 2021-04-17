@@ -10,6 +10,8 @@ Created on Sun Dec 27 15:03:57 2020
 import pandas as pd
 import collections
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 '''
@@ -77,9 +79,9 @@ def cal_level_of_coorperation(df):
         if df.psychological_ability.iloc[i] == 'uncooperative, uncommunicative':
             df.psychological_ability.iloc[i] = 1;
         if df.psychological_ability.iloc[i] == 'uncooperative, communicative':
-            df.psychological_ability.iloc[i] = 2;
-        if df.psychological_ability.iloc[i] == 'cooperative':
             df.psychological_ability.iloc[i] = 3;
+        if df.psychological_ability.iloc[i] == 'cooperative':
+            df.psychological_ability.iloc[i] = 5;
         
         # Level of coorperation (phy * Psy)
         df.level_cooperation.iloc[i] = df.physical_ability.iloc[i]* df.psychological_ability.iloc[i]        
@@ -90,9 +92,9 @@ Classify the patient ability level to High, Moderate or Low based on the abailit
 '''
 def classify_patient_level(df, col_name):
     for i in range(0, df.shape[0]):
-        if(df.level_cooperation.iloc[i] > 10):
+        if(df.level_cooperation.iloc[i] > 15):
             df[col_name].iloc[i] = 'high'
-        elif(df.level_cooperation.iloc[i] < 6):
+        elif(df.level_cooperation.iloc[i] < 10):
             df[col_name].iloc[i] = 'low'      
         else:
             df[col_name].iloc[i] = 'moderate'
@@ -208,6 +210,7 @@ def minute_interval(start, end):
           delta = 24*60 - delta
      return delta
     
+    
 '''
 Make sure all the input are small letter
 Arguement:
@@ -255,7 +258,24 @@ def add_day_to_dataset(df):
             df.day[i] = day[day_count]
     
     return df
+
+'''
+Covert the number of orders to the numeric representation
+'''
+def convert_num_orders_to_numbers(df):
+    df["num_orders_numeric"] = ['']*df.shape[0]    
     
+    for i in range(df.shape[0]):
+        if df["num_orders"].iloc[i] == "single":
+            df["num_orders_numeric"].iloc[i] = 1
+        elif df["num_orders"].iloc[i] == "two":
+            df["num_orders_numeric"].iloc[i] = 2
+        elif df["num_orders"].iloc[i] == "three":
+            df["num_orders_numeric"].iloc[i] = 3
+        else:
+            print("there are others in the number of orders... please check")
+    return df
+
 '''
 Calculate the idle time between two scans (same day)
 '''    
@@ -273,4 +293,181 @@ def calculate_idle_time(df, col_name):
             df[col_name][i] = 0
     
     return df
+
+
+################################################################################################################
+################################################################################################################
+#### For Database 
+
+'''
+Calculate the avg/ std of the number of orders on the day (Mon, Tue...)
+@ retun avg and std
+'''
+def calculate_avg_std_order_by_days(df):
+    uni = df.date.unique()
+    tmp = np.zeros(uni.shape[0])
+    ctr = 0
+    for i in range (uni.shape[0]):
+        tmp[ctr] = df[df.date == uni[i]].num_orders_numeric.sum()
+        ctr +=1
+    avg = tmp.mean()
+    std = tmp.std()
+    return avg, std
+
+'''
+Calculate the avg/ std of the idle time on the day (Mon, Tue...)
+@ retun avg and std
+'''
+def calculate_avg_std_idle_time_by_days(df):
+    uni = df.date.unique()
+    tmp = np.zeros(uni.shape[0])
+    ctr = 0
+    for i in range (uni.shape[0]):
+        tmp[ctr] = df[df.date == uni[i]].idle_time.sum()
+        ctr +=1
+    avg = tmp.mean()
+    std = tmp.std()
+    return avg, std
+
+'''
+Generate the average scan time for each scan type of a certain type of patient (in/out/icu/ucc patient).
+The results are separated to four conditions (contrast? and age group) as below:
+    - Condition1: (no contrast + Junior)
+    - Condition2: (no contrast + Senior)
+    - Condition3: (contrast + Junior)
+    - Condition4: (contrast + Senior)
+Note: Will only extract the single-scan order as the contrast is n or y
+Arguement:
+    - df_input: the extracted dataframe for the required patient type
+    - all_type_scans: a series containing all the possible scan name
+Return include the following:
+    - df_result: a dataframe stores the result(avg, std, n) of four conditions with the scan type as index
+    - (Not included at this moment, can be done in the future) dict_scan: a dictionary stores all the scan time of a particular scan type as the key
+'''
+def generate_result_four_conditions(df_input, all_type_scans, non_contrast):
+    ## 4 condictions (contrast, age)
+    # Condition1: (no contrast + Junior)
+    df_c1 = df_input.loc[(df_input.contrast == 'n') & (df_input.age_class == 'junior')].reset_index(drop=True)
+    dict_c1_scan, dict_c1_result = cal_time_based_on_order(df_c1, df_c1.order)
+    # Condition2: (no contrast + Senior)
+    df_c2 = df_input.loc[(df_input.contrast == 'n') & (df_input.age_class == 'senior')].reset_index(drop=True)
+    dict_c2_scan, dict_c2_result = cal_time_based_on_order(df_c2, df_c2.order)
+    # Condition3: (contrast + Junior)
+    df_c3 = df_input.loc[(df_input.contrast == 'y') & (df_input.age_class == 'junior')].reset_index(drop=True)
+    dict_c3_scan, dict_c3_result = cal_time_based_on_order(df_c3, df_c3.order)
+    # Condition4: (contrast + Senior)
+    df_c4 = df_input.loc[(df_input.contrast == 'y') & (df_input.age_class == 'senior')].reset_index(drop=True)
+    dict_c4_scan, dict_c4_result = cal_time_based_on_order(df_c4, df_c4.order)
+    
+    ## create a new dataframe to store the result (output)
+    column_name = ['scan_type', 'c1_mean', 'c1_std', 'c1_n', 'c2_mean', 'c2_std', 'c2_n', 'c3_mean', 'c3_std', 'c3_n', 'c4_mean', 'c4_std', 'c4_n']
+    df_out = pd.DataFrame(columns=column_name)
+    # add in the all the scans in the dataframe
+    df_out = df_out.assign(scan_type = all_type_scans.index)    
+    # set the scan_type as index
+    df_out.set_index('scan_type', inplace=True)
+   
+    # df_out = pd.DataFrame()
+    ## merge all the resulted dictionaries to one dataframe
+    for key, value in dict_c1_result.items():
+        df_out.loc[key, 0:3] = value
+    for key, value in dict_c2_result.items():
+        df_out.loc[key, 3:6] = value    
+    for key, value in dict_c3_result.items():
+        df_out.loc[key, 6:9] = value
+    for key, value in dict_c4_result.items():
+        df_out.loc[key, 9:12] = value       
+
+    ## return
+    # return df_out, dict_c1_result, dict_c2_result, dict_c3_result, dict_c4_result
+    return df_out
+    
+'''
+Create dictionaries to store the each scan time sorted by the type of scan (order)
+NOTED: need to fix the scan time and transfer time thing (no transfer time here)
+'''
+def cal_time_based_on_order(df_dataInput, scans):
+    dict_sortedData_scan = {key:[] for key in scans}
+    dict_sortedData_transfer = {key:[] for key in scans}
+    dict_result = {key:[] for key in scans}
+
+    # create a dict to stores the scan time by the order (scan)
+    for i in range (df_dataInput.shape[0]):
+        key = df_dataInput.order[i]
+        dict_sortedData_scan[key].append(df_dataInput.minutes[i])
+
+    # # create a dict to stores the transfer time by the order (scan)
+    # (HAVEN'T FINISH!!)
+    # for i in range (df_dataInput.shape[0]):
+    #     key = df_dataInput.order[i]
+    #     dict_sortedData_transfer[key].append(df_dataInput.minutes[i])
+
+        
+    # calculate the mean, std and the number of data (in sequence) of the scan time of each order
+    for key, value in dict_sortedData_scan.items():
+        np_scanTime = np.array(dict_sortedData_scan[key])
+        dict_result[key].append(np_scanTime.mean())
+        dict_result[key].append(np_scanTime.std())
+        dict_result[key].append(len(np_scanTime))
+    # # calculate the mean, std and the number of data (in sequence) of the transfer time of each order      
+    # for key, value in dict_sortedData_transfer.items():       
+    #     np_transferTime = np.array(dict_sortedData_transfer[key])
+    #     dict_result[key].append(np_transferTime.mean())
+    #     dict_result[key].append(np_transferTime.std())
+    #     dict_result[key].append(len(np_transferTime))       
+    
+    return dict_sortedData_scan, dict_result
+
+
+'''
+Generate the average scan time for each scan type 
+Arguement:
+    - df_input: the extracted dataframe for the required patient type
+    - all_type_scans: a series containing all the possible scan name
+Return include the following:
+    - df_result: a dataframe stores the result(avg, std, n) of four conditions with the scan type as index
+    - (Not included at this moment, can be done in the future) dict_scan: a dictionary stores all the scan time of a particular scan type as the key
+'''
+def generate_result(df_input, all_type_scans):
+    
+    dict_scan, dict_result = cal_time_based_on_order(df_input, df_input.order)
+    
+    ## create a new dataframe to store the result (output)
+    column_name = ['scan_type', 'mean', 'std', 'n']
+    df_out = pd.DataFrame(columns=column_name)
+    # add in the all the scans in the dataframe
+    df_out = df_out.assign(scan_type = all_type_scans.index)    
+    # set the scan_type as index
+    df_out.set_index('scan_type', inplace=True)
+
+    # add data to dataframe
+    for key, value in dict_result.items():
+        df_out.loc[key, 0:3] = value
+    
+    return df_out
+
+
+'''
+Calculate the correlation between the level of coorperation and the transfer time
+Arguement:
+    - patient_type: ip, op, ucc or icu
+    - score_type: physical_ability, psychological_ability or level_cooperation
+'''
+def score_y_coorelation(patient_type, score_type, y, df_input, write_directory, txt=""):
+    #extract the corresponding sub-set
+    df_input = df_input[df_input.patient_type == patient_type].reset_index(drop=True)
+    N = df_input[df_input.patient_type == patient_type].shape[0]
+    if N == 0:
+        return
+    plt.figure()
+    sns.stripplot(data=df_input, x=score_type, y=y, jitter=0.15, size=10) 
+    if y == "minutes":
+        y = "scan_time"
+    plt.title("{} score vs. {}: {} {} ({})".format(score_type, y, patient_type, txt, N))
+    plt.xlabel("{}".format(score_type))
+    plt.ylabel("Time (min.)")   
+    
+    plt.savefig(write_directory + 'Coorelation {} vs {} - {} patients {} {}).png'.format(score_type, y, patient_type, N, txt))
+    
+    return 0
     
